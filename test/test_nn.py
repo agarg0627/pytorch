@@ -8719,6 +8719,17 @@ class TestNNDeviceType(NNTestCase):
                 torch.zeros(1, 1, 1, 4, 4, device=device, dtype=dtype),
                 padding=[0, 0, 0, 0, -2, -2])
 
+        for pad_fn, pad_inp, pad_arg in [
+            (torch._C._nn.replication_pad1d,
+             torch.zeros(1, 1, 4, device=device, dtype=dtype), [2**63 - 1, 2]),
+            (torch._C._nn.replication_pad2d,
+             torch.zeros(1, 1, 4, 4, device=device, dtype=dtype), [2**63 - 1, 2**63 - 1, 0, 0]),
+            (torch._C._nn.replication_pad3d,
+             torch.zeros(1, 1, 4, 4, 4, device=device, dtype=dtype), [0, 0, 2**63 - 1, 2**63 - 1, 0, 0]),
+        ]:
+            with self.assertRaisesRegex(RuntimeError, 'overflowed'):
+                pad_fn(pad_inp, padding=pad_arg)
+
         # The Python meta registration (used by FakeTensor / torch.compile /
         # device='meta') shares the same shape check; verify it is consistent
         # with the device kernels above.

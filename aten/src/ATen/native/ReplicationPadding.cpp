@@ -5,6 +5,7 @@
 #include <ATen/TensorMeta.h>
 #include <ATen/native/Padding.h>
 #include <c10/util/irange.h>
+#include <c10/util/safe_numerics.h>
 
 #ifndef AT_PER_OPERATOR_HEADERS
 #include <ATen/Functions.h>
@@ -20,6 +21,18 @@
 #endif
 
 namespace at::meta {
+
+namespace {
+int64_t padded_output_size(int64_t input_size, int64_t pad_a, int64_t pad_b) {
+  int64_t out = 0;
+  bool overflow = c10::add_overflows(input_size, pad_a, &out);
+  overflow |= c10::add_overflows(out, pad_b, &out);
+  TORCH_CHECK(!overflow,
+      "output size computation overflowed for input size ", input_size,
+      " with padding (", pad_a, ", ", pad_b, ")");
+  return out;
+}
+} // namespace
 
 TORCH_META_FUNC(replication_pad1d) (
   const Tensor& input, IntArrayRef paddingSize  // no out argument!
@@ -44,7 +57,7 @@ TORCH_META_FUNC(replication_pad1d) (
   /* sizes */
   int64_t nslices = input.size(dimslices);
   int64_t iwidth = input.size(dimw);
-  int64_t owidth = iwidth + pad_l + pad_r;
+  int64_t owidth = padded_output_size(iwidth, pad_l, pad_r);
 
   TORCH_CHECK(owidth >= 1,
       "input (W: ", iwidth, ") is too small."
@@ -114,8 +127,8 @@ TORCH_META_FUNC(replication_pad2d) (
   int64_t nslices = input.size(dimslices);
   int64_t iheight = input.size(dimh);
   int64_t iwidth = input.size(dimw);
-  int64_t oheight = iheight + pad_t + pad_b;
-  int64_t owidth  = iwidth + pad_l + pad_r;
+  int64_t oheight = padded_output_size(iheight, pad_t, pad_b);
+  int64_t owidth  = padded_output_size(iwidth, pad_l, pad_r);
 
   TORCH_CHECK(owidth >= 1 && oheight >= 1,
       "Calculated output H: ", oheight, " W: ", owidth,
@@ -160,9 +173,9 @@ TORCH_META_FUNC(replication_pad3d) (
   int64_t idepth = input.size(dimd);
   int64_t iheight = input.size(dimh);
   int64_t iwidth = input.size(dimw);
-  int64_t odepth = idepth + pfront + pback;
-  int64_t oheight = iheight + ptop + pbottom;
-  int64_t owidth  = iwidth + pleft + pright;
+  int64_t odepth = padded_output_size(idepth, pfront, pback);
+  int64_t oheight = padded_output_size(iheight, ptop, pbottom);
+  int64_t owidth  = padded_output_size(iwidth, pleft, pright);
 
   TORCH_CHECK(owidth >= 1 && oheight >= 1 && odepth >= 1,
       "Calculated output D: ", odepth, " H: ", oheight, " W: ", owidth,
