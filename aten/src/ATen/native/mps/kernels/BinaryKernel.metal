@@ -267,23 +267,26 @@ struct nextafter_functor {
   // Metal has no bfloat nextafter overload, so open-code the musl algorithm
   // over the sign-magnitude bit pattern.
   inline bfloat operator()(const bfloat from, const bfloat to) {
-    if (from != from || to != to) {
-      return from + to;
-    }
-    if (from == to) {
-      return to;
-    }
     ushort ufrom = as_type<ushort>(from);
-    if (from == 0) {
-      ushort r = (as_type<ushort>(to) & (ushort(1) << 15)) | ushort(1);
-      return as_type<bfloat>(r);
-    }
-    if ((from < to) == (from > 0)) {
-      ufrom++;
+    ushort uto = as_type<ushort>(to);
+    ushort from_abs = ufrom & ushort(0x7fff);
+    ushort to_abs = uto & ushort(0x7fff);
+    ushort bits;
+    if (from_abs > ushort(0x7f80) || to_abs > ushort(0x7f80)) {
+      bits = ushort(0x7fc0);
+    } else if (ufrom == uto || (from_abs | to_abs) == 0) {
+      bits = uto;
+    } else if (from_abs == 0) {
+      bits = (uto & ushort(0x8000)) | ushort(1);
     } else {
-      ufrom--;
+      bool from_neg = (ufrom & ushort(0x8000)) != 0;
+      bool to_neg = (uto & ushort(0x8000)) != 0;
+      bool from_lt_to = from_neg != to_neg
+          ? from_neg
+          : (from_neg ? from_abs > to_abs : from_abs < to_abs);
+      bits = (from_lt_to != from_neg) ? ufrom + ushort(1) : ufrom - ushort(1);
     }
-    return as_type<bfloat>(ufrom);
+    return as_type<bfloat>(bits);
   }
 };
 

@@ -15486,7 +15486,15 @@ class TestAdvancedIndexing(TestCaseMPS):
             # greater is broken on MPS, see https://github.com/pytorch/pytorch/issues/125051
             na_ge_x_cpu = na_cpu > x.cpu()
             self.assertEqual(na_ge_x_mps, na_ge_x_cpu)
-            self.assertEqual(na, na_cpu)
+            self.assertEqual(na, na_cpu, atol=0, rtol=0)
+        pos_bits = torch.arange(10, dtype=torch.int16)
+        neg_bits = torch.arange(-0x8000, -0x8000 + 10, dtype=torch.int16)
+        x = torch.cat([pos_bits, neg_bits]).view(torch.bfloat16)
+        for y_val in (1.0, -1.0):
+            y = torch.full_like(x, y_val)
+            na = torch.nextafter(x.to(device), y.to(device))
+            na_cpu = torch.nextafter(x, y)
+            self.assertEqual(na.cpu().view(torch.int16), na_cpu.view(torch.int16))
 
 
 class TestRNNMPS(TestCaseMPS):
