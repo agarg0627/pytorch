@@ -15585,6 +15585,22 @@ if __name__ == '__main__':
             # Check that backward does not cause a hard error
             outs[0].sum().backward()
 
+    @onlyCPU
+    def test_lstm_hx_cx_layer_count_mismatch(self, device):
+        h_0 = torch.randn(4, 1, 8, device=device)
+        c_0 = torch.randn(3, 1, 8, device=device)
+        w_ih = torch.randn(32, 8, device=device)
+        w_hh = torch.randn(32, 8, device=device)
+        params = [w_ih, w_hh] * 3
+        msg = "expects hx and cx to have the same first dimension"
+        inp = torch.randn(10, 1, 8, device=device)
+        with self.assertRaisesRegex(RuntimeError, msg):
+            torch.ops.aten.lstm(inp, [h_0, c_0], params, False, 3, 0.0, False, False, False)
+        data = torch.randn(10, 8, device=device)
+        batch_sizes = torch.tensor([10], dtype=torch.int64)
+        with self.assertRaisesRegex(RuntimeError, msg):
+            torch.ops.aten.lstm.data(data, batch_sizes, [h_0, c_0], params, False, 3, 0.0, False, False)
+
     @skipMPS
     def test_PReLU_backward_requires_grad_false(self, device):
         m = nn.PReLU().to(device)

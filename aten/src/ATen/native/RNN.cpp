@@ -1172,6 +1172,9 @@ std::tuple<io_type, Tensor, Tensor> _lstm_impl(
       int64_t num_layers, double dropout_p, bool train, bool bidirectional) {
   // It's much more useful for us to work on lists of pairs of hx and cx for each layer, so we need
   // to transpose a pair of those tensors.
+  TORCH_CHECK(hx.sym_size(0) == cx.sym_size(0),
+      "lstm expects hx and cx to have the same first dimension, but got hx.size(0) = ",
+      hx.sym_size(0), " and cx.size(0) = ", cx.sym_size(0));
   auto layer_hx = hx.unbind(0);
   auto layer_cx = cx.unbind(0);
   int64_t total_layers = layer_hx.size();
