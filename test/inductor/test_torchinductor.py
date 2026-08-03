@@ -12203,6 +12203,16 @@ def forward(self, arg0_1: "Sym(s77)", arg1_1: "Sym(s27)", arg2_1: "Sym(s53)", ar
 
         self.common(fn, [torch.randn(55, device=self.device)], assert_equal=False)
 
+    def test_empty_strided_zero_numel_negative_stride(self):
+        # https://github.com/pytorch/pytorch/issues/188227
+        def fn(a):
+            idx = aten.empty_strided(
+                (0, 0), (-1, 0), dtype=torch.int64, device=self.device
+            )
+            return aten.gather(a, -2, idx)
+
+        self.common(fn, [torch.randn(3, 3, device=self.device)])
+
     def test_dropout_trivial_0(self):
         def fn1(a):
             return torch.nn.functional.dropout(a, 0.0, True) + a

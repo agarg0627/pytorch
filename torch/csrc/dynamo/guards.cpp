@@ -1204,16 +1204,25 @@ static PyObject* copy_if_misaligned(PyObject* dummy, PyObject* item) {
   return THPVariable_Wrap(std::move(result));
 }
 
-template <typename T>
-static void unwrap_size_tuple(PyObject* obj, T& output) {
+template <bool allow_negative, typename T>
+static void unwrap_int_tuple(PyObject* obj, T& output) {
   TORCH_CHECK(PyTuple_CheckExact(obj));
   size_t len = PyTuple_GET_SIZE(obj);
   output.reserve(len);
   for (size_t i = 0; i < len; ++i) {
     auto result = PyLong_AsSsize_t(PyTuple_GET_ITEM(obj, i));
-    TORCH_CHECK(result >= 0);
+    if constexpr (!allow_negative) {
+      TORCH_CHECK(result >= 0);
+    } else {
+      TORCH_CHECK(result != -1 || !PyErr_Occurred());
+    }
     output.emplace_back(result);
   }
+}
+
+template <typename T>
+static void unwrap_size_tuple(PyObject* obj, T& output) {
+  unwrap_int_tuple<false>(obj, output);
 }
 
 template <typename T>
@@ -1226,7 +1235,7 @@ static void _parse_empty_strided_args(
   TORCH_CHECK(PyTuple_GET_SIZE(args) == 3);
   // note PyTuple_GET_ITEM returns a borrowed ref, so no need for refcounts
   unwrap_size_tuple(PyTuple_GET_ITEM(args, 0), sizes);
-  unwrap_size_tuple(PyTuple_GET_ITEM(args, 1), strides);
+  unwrap_int_tuple<true>(PyTuple_GET_ITEM(args, 1), strides);
   PyObject* py_dtype = PyTuple_GET_ITEM(args, 2);
   TORCH_CHECK(THPDtype_Check(py_dtype));
   dtype = reinterpret_cast<THPDtype*>(py_dtype)->scalar_type;
